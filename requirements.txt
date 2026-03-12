@@ -1,0 +1,4 @@
+aiohttp>=3.9.0
+requests>=2.31.0
+paho-mqtt>=1.6.1
+aiomqtt>=2.0.0

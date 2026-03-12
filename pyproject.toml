@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "navimow-sdk"
+version = "0.1.0"
+description = "Python SDK for cloud mower platform integration with smart home systems."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Navimow R&D Team", email = "segwaynavimowapp@gmail.com"}
+]
+keywords = ["mower", "sdk", "home-assistant", "iot", "mqtt", "oauth2"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Home Automation",
+]
+
+dependencies = [
+    "aiohttp>=3.9.0",
+    "requests>=2.31.0",
+    "paho-mqtt>=1.6.1",
+    "aiomqtt>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/segwaynavimow/navimow-sdk"
+Documentation = "https://github.com/segwaynavimow/navimow-sdk#readme"
+Repository = "https://github.com/segwaynavimow/navimow-sdk"
+Issues = "https://github.com/segwaynavimow/navimow-sdk/issues"
+
+[tool.setuptools]
+packages = ["mower_sdk"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
