@@ -1,15 +1,23 @@
-"""自定义异常类模块。
+"""Custom exception module.
+
+自定义异常类模块。
+
+Provides all custom exception types used in the SDK.
 
 提供 SDK 中使用的所有自定义异常类型。
 """
 
 
 class MowerAPIError(Exception):
-    """API 请求相关的异常。
+    """API request exception.
+
+    API 请求相关的异常。
 
     Attributes:
+        status_code: HTTP status code, if available
         status_code: HTTP 状态码（如果可用）
-        message: 错误消息
+        message: Error message
+        error_code: Business error code, if available
         error_code: 业务错误码（如果可用）
     """
 
@@ -19,11 +27,16 @@ class MowerAPIError(Exception):
         status_code: int | None = None,
         error_code: str | None = None,
     ):
-        """初始化 API 异常。
+        """Initialize the API exception.
+
+        初始化 API 异常。
 
         Args:
+            message: Error message
             message: 错误消息
+            status_code: HTTP status code
             status_code: HTTP 状态码
+            error_code: Business error code
             error_code: 业务错误码
         """
         super().__init__(message)
@@ -32,7 +45,10 @@ class MowerAPIError(Exception):
         self.error_code = error_code
 
     def __str__(self) -> str:
-        """返回格式化的错误消息。"""
+        """Return a formatted error message.
+
+        返回格式化的错误消息。
+        """
         parts = [self.message]
         if self.status_code:
             parts.append(f"HTTP {self.status_code}")
@@ -42,16 +58,22 @@ class MowerAPIError(Exception):
 
 
 class MowerAuthError(Exception):
-    """认证相关的异常。
+    """Authentication-related exception.
+
+    认证相关的异常。
 
     Attributes:
+        message: Error message
         message: 错误消息
     """
 
     def __init__(self, message: str):
-        """初始化认证异常。
+        """Initialize the authentication exception.
+
+        初始化认证异常。
 
         Args:
+            message: Error message
             message: 错误消息
         """
         super().__init__(message)
@@ -59,22 +81,29 @@ class MowerAuthError(Exception):
 
 
 class MowerMQTTError(Exception):
-    """MQTT 相关的异常。
+    """MQTT-related exception.
+
+    MQTT 相关的异常。
 
     Attributes:
+        message: Error message
         message: 错误消息
     """
 
     def __init__(self, message: str):
-        """初始化 MQTT 异常。
+        """Initialize the MQTT exception.
+
+        初始化 MQTT 异常。
 
         Args:
+            message: Error message
             message: 错误消息
         """
         super().__init__(message)
         self.message = message
 
 
+# Error message dictionary
 # 错误消息字典
 ERROR_MESSAGES = {
     "AUTH_FAILED": "认证失败，请检查 client_id 和 client_secret",
@@ -90,6 +119,7 @@ ERROR_MESSAGES = {
     "INVALID_DEVICE_STATUS": "无效的设备状态",
 }
 
+# Command error mappings
 # 指令错误映射
 COMMAND_ERRORS = {
     "START": {
