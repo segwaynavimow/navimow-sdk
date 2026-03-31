@@ -71,4 +71,4 @@ Issues and Pull Requests are welcome.
 
 ## License
 
-MIT License
+GPL License
