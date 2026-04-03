@@ -69,6 +69,23 @@ class NavimowSDK:
         """Disconnect from MQTT broker."""
         self._mqtt.disconnect()
 
+    def update_mqtt_credentials(
+        self,
+        username: str | None = None,
+        password: str | None = None,
+        auth_headers: dict[str, str] | None = None,
+    ) -> None:
+        """更新 MQTT 凭据。若与当前值不同，将重建 paho client 并重连。
+
+        用于 OAuth token 刷新后同步更新 MQTT WebSocket 认证头，
+        以及更新服务端下发的 MQTT username/password。
+        """
+        self._mqtt.update_credentials(
+            username=username,
+            password=password,
+            auth_headers=auth_headers,
+        )
+
     def on_state(self, callback: Callable[[DeviceStateMessage], None]) -> None:
         self._state_callbacks.append(callback)
 

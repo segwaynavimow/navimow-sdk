@@ -497,6 +497,61 @@ class NavimowMQTT:
     def is_connected(self) -> bool:
         return self.client.is_connected()
 
+    def _build_new_client(self) -> mqtt_client.Client:
+        """重建 paho MQTT client，使用当前最新的凭据和配置。"""
+        transport = "websockets" if self.ws_path else "tcp"
+        client = mqtt_client.Client(client_id=self._client_id, transport=transport)
+        if self.username and self.password:
+            client.username_pw_set(self.username, self.password)
+        if self.ws_path:
+            client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
+        if self._use_tls:
+            client.tls_set()
+        client.on_connect = self._on_connect
+        client.on_disconnect = self._on_disconnect
+        client.on_message = self._on_message
+        return client
+
+    def update_credentials(
+        self,
+        username: str | None = None,
+        password: str | None = None,
+        auth_headers: dict[str, str] | None = None,
+    ) -> None:
+        """更新 MQTT 凭据，并在已连接时触发重连以使新凭据生效。
+
+        paho-mqtt 的 ws_set_options 只在建立连接前有效，因此必须重建 client 并重连。
+        """
+        changed = False
+        if username is not None and username != self.username:
+            self.username = username
+            changed = True
+        if password is not None and password != self.password:
+            self.password = password
+            changed = True
+        if auth_headers is not None and auth_headers != self.auth_headers:
+            self.auth_headers = auth_headers
+            changed = True
+
+        if not changed:
+            return
+
+        _LOGGER.info(
+            "NavimowMQTT credentials updated, rebuilding client and reconnecting: broker=%s port=%s",
+            self.broker,
+            self.port,
+        )
+        try:
+            self.client.loop_stop()
+            self.client.disconnect()
+        except Exception:
+            pass
+
+        self.client = self._build_new_client()
+        # 无论之前是否已连接，都重新发起连接——断连场景下需要重连，
+        # 主动刷新凭据场景下也需要用新凭据重建连接。
+        self.connect_async()
+
     def connect_async(self) -> None:
         if not self.is_connected:
             _LOGGER.info(
