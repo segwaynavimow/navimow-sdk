@@ -1,4 +1,8 @@
-"""主客户端模块。
+"""Main client module.
+
+主客户端模块。
+
+Provides a unified client interface that aggregates all functionality.
 
 提供聚合所有功能的统一客户端接口。
 """
@@ -15,12 +19,18 @@ if TYPE_CHECKING:
 
 
 class MowerClient:
-    """割草机平台主客户端。
+    """Main mower platform client.
+
+    割草机平台主客户端。
+
+    Aggregates REST API and MQTT functionality to provide a unified interface.
 
     聚合 REST API 和 MQTT 功能，提供统一的接口。
 
     Attributes:
+        api: REST API client
         api: REST API 客户端
+        mqtt: MQTT client
         mqtt: MQTT 客户端
     """
 
@@ -34,15 +44,24 @@ class MowerClient:
         mqtt_username: str | None = None,
         mqtt_password: str | None = None,
     ):
-        """初始化主客户端。
+        """Initialize the main client.
+
+        初始化主客户端。
 
         Args:
+            session: aiohttp session
             session: aiohttp 会话
+            token: Access token
             token: 访问令牌
+            api_base_url: REST API base URL
             api_base_url: REST API 基础 URL
+            mqtt_broker: MQTT broker address
             mqtt_broker: MQTT broker 地址
+            mqtt_port: MQTT broker port
             mqtt_port: MQTT broker 端口
+            mqtt_username: MQTT username, optional
             mqtt_username: MQTT 用户名（可选）
+            mqtt_password: MQTT password, optional
             mqtt_password: MQTT 密码（可选）
         """
         self.api = MowerAPI(session=session, token=token, base_url=api_base_url)
@@ -60,12 +79,18 @@ class MowerClient:
         self._token = token
 
     def update_token(self, token: str) -> None:
-        """更新访问令牌。"""
+        """Update the access token.
+
+        更新访问令牌。
+        """
         self._token = token
         self.api.set_token(token)
 
     async def async_refresh_mqtt_info(self) -> dict[str, Any]:
-        """异步刷新 MQTT 连接信息。"""
+        """Refresh MQTT connection information asynchronously.
+
+        异步刷新 MQTT 连接信息。
+        """
         info = await self.api.async_get_mqtt_user_info()
         mqtt_host = info.get("mqttHost", "")
         mqtt_url = info.get("mqttUrl", "")
@@ -88,7 +113,10 @@ class MowerClient:
         return info
 
     def refresh_mqtt_info(self) -> dict[str, Any]:
-        """同步刷新 MQTT 连接信息。"""
+        """Refresh MQTT connection information synchronously.
+
+        同步刷新 MQTT 连接信息。
+        """
         return asyncio.run(self.async_refresh_mqtt_info())
 
     async def async_discover_devices(self) -> list[Device]:
@@ -337,5 +365,8 @@ class MowerClient:
         return asyncio.run(self.api.async_get_device_statuses(device_ids))
 
     def get_token(self) -> str:
-        """获取当前访问令牌。"""
+        """Get the current access token.
+
+        获取当前访问令牌。
+        """
         return self._token
