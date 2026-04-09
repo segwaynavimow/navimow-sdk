@@ -6,7 +6,6 @@
 import asyncio
 import json
 import logging
-import ssl
 import uuid
 from urllib.parse import urlparse
 from collections.abc import Awaitable, Callable
@@ -485,9 +484,6 @@ class NavimowMQTT:
         self.keepalive_seconds = max(30, int(keepalive_seconds))
         self.reconnect_min_delay = max(0, int(reconnect_min_delay))
         self.reconnect_max_delay = max(self.reconnect_min_delay, int(reconnect_max_delay))
-        # 预创建 SSL context，避免每次 _build_new_client 都调用 set_default_verify_paths（阻塞操作）。
-        # __init__ 在 executor 中执行，此处调用安全。后续复用同一 context 即可。
-        self._ssl_context: ssl.SSLContext | None = ssl.create_default_context() if self._use_tls else None
 
         self.on_connected: Callable[[], Awaitable[None]] | None = None
         self.on_ready: Callable[[], Awaitable[None]] | None = None
@@ -500,8 +496,8 @@ class NavimowMQTT:
             self.client.username_pw_set(self.username, self.password)
         if self.ws_path:
             self.client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
-        if self._ssl_context is not None:
-            self.client.tls_set(context=self._ssl_context)
+        if self._use_tls:
+            self.client.tls_set()
         self.client.reconnect_delay_set(
             min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
         )
@@ -530,10 +526,7 @@ class NavimowMQTT:
             client.username_pw_set(self.username, self.password)
         if self.ws_path:
             client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
-        if self._ssl_context is not None:
-            # 复用预创建的 SSL context，避免重复调用 set_default_verify_paths（阻塞）
-            client.tls_set(context=self._ssl_context)
-        elif self._use_tls:
+        if self._use_tls:
             client.tls_set()
         client.reconnect_delay_set(
             min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
