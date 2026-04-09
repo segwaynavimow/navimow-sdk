@@ -320,7 +320,7 @@ class MowerMQTT:
                     _LOGGER.exception("Error processing MQTT message: %s", e)
 
             def on_disconnect(_client, _userdata, _rc) -> None:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "MQTT disconnected (async): broker=%s port=%s device=%s",
                     self.broker,
                     self.port,
@@ -687,7 +687,7 @@ class NavimowMQTT:
             self._schedule(self.on_ready())
 
     def _on_disconnect(self, _client, _userdata, _rc) -> None:
-        _LOGGER.warning(
+        _LOGGER.debug(
             "NavimowMQTT disconnected: broker=%s port=%s rc=%s",
             self.broker,
             self.port,
