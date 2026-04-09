@@ -40,6 +40,9 @@ class NavimowSDK:
         auth_headers: dict[str, str] | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
         records: list[Any] | None = None,
+        keepalive_seconds: int = 2400,
+        reconnect_min_delay: int = 1,
+        reconnect_max_delay: int = 60,
     ) -> None:
         self._loop = loop or asyncio.get_event_loop()
         self._mqtt = NavimowMQTT(
@@ -51,6 +54,9 @@ class NavimowSDK:
             ws_path=ws_path,
             auth_headers=auth_headers,
             loop=self._loop,
+            keepalive_seconds=keepalive_seconds,
+            reconnect_min_delay=reconnect_min_delay,
+            reconnect_max_delay=reconnect_max_delay,
         )
         self._mqtt.on_message = self._on_mqtt_message
 

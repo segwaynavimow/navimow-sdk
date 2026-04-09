@@ -70,6 +70,9 @@ class MowerMQTT:
         password: str | None = None,
         ws_path: str | None = None,
         auth_headers: dict[str, str] | None = None,
+        keepalive_seconds: int = 2400,
+        reconnect_min_delay: int = 1,
+        reconnect_max_delay: int = 60,
     ):
         """初始化 MQTT 客户端。
 
@@ -85,6 +88,11 @@ class MowerMQTT:
         self.password = password
         self.ws_path = ws_path
         self.auth_headers = auth_headers
+        # KeepAlive 是 MQTT 协议层保活（PINGREQ/PINGRESP），优先于应用层“心跳消息”。
+        # 这里默认 40 分钟，确保在“1 小时无流量断连”的 broker/LB 前有协议层流量。
+        self.keepalive_seconds = max(30, int(keepalive_seconds))
+        self.reconnect_min_delay = max(0, int(reconnect_min_delay))
+        self.reconnect_max_delay = max(self.reconnect_min_delay, int(reconnect_max_delay))
         self._use_tls = bool(ws_path)
         self._client_id = _build_web_client_id(self.username)
         self.status_cache: dict[str, DeviceStatus] = {}
@@ -123,6 +131,10 @@ class MowerMQTT:
             client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
         if self._use_tls:
             client.tls_set()
+        # 断线自动重连退避（paho 在 loop_start + connect_async 场景下会按该策略重连）
+        client.reconnect_delay_set(
+            min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
+        )
         _LOGGER.debug(
             "MQTT client built: transport=%s broker=%s port=%s ws_path=%s tls=%s client_id=%s",
             transport,
@@ -211,7 +223,7 @@ class MowerMQTT:
                 self.port,
                 self.ws_path,
             )
-            self._sync_client.connect(self.broker, self.port, 60)
+            self._sync_client.connect(self.broker, self.port, self.keepalive_seconds)
             self._sync_client.loop_start()
         except Exception as e:
             raise MowerMQTTError(
@@ -327,7 +339,7 @@ class MowerMQTT:
                 self.ws_path,
                 device_id,
             )
-            self._async_client.connect(self.broker, self.port, 60)
+            self._async_client.connect(self.broker, self.port, self.keepalive_seconds)
             self._async_client.loop_start()
 
             await self._async_stop_event.wait()
@@ -454,6 +466,9 @@ class NavimowMQTT:
         ws_path: str | None = None,
         auth_headers: dict[str, str] | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
+        keepalive_seconds: int = 2400,
+        reconnect_min_delay: int = 1,
+        reconnect_max_delay: int = 60,
     ) -> None:
         parsed = urlparse(broker)
         self.broker = parsed.hostname or broker
@@ -466,6 +481,9 @@ class NavimowMQTT:
         self.auth_headers = auth_headers
         self._use_tls = bool(ws_path) or parsed.scheme == "wss"
         self._client_id = _build_web_client_id(self.username)
+        self.keepalive_seconds = max(30, int(keepalive_seconds))
+        self.reconnect_min_delay = max(0, int(reconnect_min_delay))
+        self.reconnect_max_delay = max(self.reconnect_min_delay, int(reconnect_max_delay))
 
         self.on_connected: Callable[[], Awaitable[None]] | None = None
         self.on_ready: Callable[[], Awaitable[None]] | None = None
@@ -480,6 +498,9 @@ class NavimowMQTT:
             self.client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
         if self._use_tls:
             self.client.tls_set()
+        self.client.reconnect_delay_set(
+            min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
+        )
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
@@ -507,6 +528,9 @@ class NavimowMQTT:
             client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
         if self._use_tls:
             client.tls_set()
+        client.reconnect_delay_set(
+            min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
+        )
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_message
@@ -570,7 +594,7 @@ class NavimowMQTT:
                 self.port,
                 self.ws_path,
             )
-            self.client.connect_async(self.broker, self.port, 60)
+            self.client.connect_async(self.broker, self.port, self.keepalive_seconds)
             self.client.loop_start()
 
     def disconnect(self) -> None:
@@ -654,9 +678,10 @@ class NavimowMQTT:
 
     def _on_disconnect(self, _client, _userdata, _rc) -> None:
         _LOGGER.warning(
-            "NavimowMQTT disconnected: broker=%s port=%s",
+            "NavimowMQTT disconnected: broker=%s port=%s rc=%s",
             self.broker,
             self.port,
+            _rc,
         )
         if self.on_disconnected is not None:
             self._schedule(self.on_disconnected())
