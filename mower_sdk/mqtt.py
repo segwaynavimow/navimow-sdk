@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import ssl
 import uuid
 from urllib.parse import urlparse
 from collections.abc import Awaitable, Callable
@@ -484,6 +485,9 @@ class NavimowMQTT:
         self.keepalive_seconds = max(30, int(keepalive_seconds))
         self.reconnect_min_delay = max(0, int(reconnect_min_delay))
         self.reconnect_max_delay = max(self.reconnect_min_delay, int(reconnect_max_delay))
+        # 预创建 SSL context，避免每次 _build_new_client 都调用 set_default_verify_paths（阻塞操作）。
+        # __init__ 在 executor 中执行，此处调用安全。后续复用同一 context 即可。
+        self._ssl_context: ssl.SSLContext | None = ssl.create_default_context() if self._use_tls else None
 
         self.on_connected: Callable[[], Awaitable[None]] | None = None
         self.on_ready: Callable[[], Awaitable[None]] | None = None
@@ -496,8 +500,8 @@ class NavimowMQTT:
             self.client.username_pw_set(self.username, self.password)
         if self.ws_path:
             self.client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
-        if self._use_tls:
-            self.client.tls_set()
+        if self._ssl_context is not None:
+            self.client.tls_set(context=self._ssl_context)
         self.client.reconnect_delay_set(
             min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
         )
@@ -526,7 +530,10 @@ class NavimowMQTT:
             client.username_pw_set(self.username, self.password)
         if self.ws_path:
             client.ws_set_options(path=self.ws_path, headers=self.auth_headers or {})
-        if self._use_tls:
+        if self._ssl_context is not None:
+            # 复用预创建的 SSL context，避免重复调用 set_default_verify_paths（阻塞）
+            client.tls_set(context=self._ssl_context)
+        elif self._use_tls:
             client.tls_set()
         client.reconnect_delay_set(
             min_delay=self.reconnect_min_delay, max_delay=self.reconnect_max_delay
@@ -542,9 +549,10 @@ class NavimowMQTT:
         password: str | None = None,
         auth_headers: dict[str, str] | None = None,
     ) -> None:
-        """更新 MQTT 凭据，并在已连接时触发重连以使新凭据生效。
+        """更新 MQTT 凭据。若当前已连接，只更新存储值，待下次重连时生效；若已断开，则立即重连。
 
-        paho-mqtt 的 ws_set_options 只在建立连接前有效，因此必须重建 client 并重连。
+        paho-mqtt 的 ws_set_options 只在建立连接前有效，因此重连时需要重建 client。
+        已连接时不主动断开，避免因 OAuth token 轮换导致每小时强制断连。
         """
         changed = False
         if username is not None and username != self.username:
@@ -560,8 +568,19 @@ class NavimowMQTT:
         if not changed:
             return
 
+        if self.client.is_connected():
+            # 当前连接正常，新凭据已存储，待 broker 下次断连后重连时自动生效。
+            # 不主动断开，避免 token 每小时轮换触发不必要的重连和"设备不可用"。
+            _LOGGER.info(
+                "NavimowMQTT credentials updated while connected (will apply on next reconnect): broker=%s port=%s",
+                self.broker,
+                self.port,
+            )
+            return
+
+        # 当前已断开，立即用新凭据重建 client 并重连。
         _LOGGER.info(
-            "NavimowMQTT credentials updated, rebuilding client and reconnecting: broker=%s port=%s",
+            "NavimowMQTT credentials updated while disconnected, rebuilding and reconnecting: broker=%s port=%s",
             self.broker,
             self.port,
         )
@@ -572,8 +591,6 @@ class NavimowMQTT:
             pass
 
         self.client = self._build_new_client()
-        # 无论之前是否已连接，都重新发起连接——断连场景下需要重连，
-        # 主动刷新凭据场景下也需要用新凭据重建连接。
         self.connect_async()
 
     def connect_async(self) -> None:
