@@ -1,4 +1,8 @@
-"""MQTT 客户端模块。
+"""MQTT client module.
+
+MQTT 客户端模块。
+
+Provides MQTT connection, subscription, and device status update functionality.
 
 提供 MQTT 连接、订阅和设备状态更新功能。
 """
@@ -47,18 +51,30 @@ def _format_auth_headers(headers: dict[str, str] | None) -> str:
 
 
 class MowerMQTT:
-    """MQTT 客户端。
+    """MQTT client.
+
+    MQTT 客户端。
+
+    Provides MQTT connection, subscription, and device status update functionality with both sync and async interfaces.
 
     提供 MQTT 连接、订阅和设备状态更新功能，支持同步和异步接口。
 
     Attributes:
+        broker: MQTT broker address
         broker: MQTT broker 地址
+        port: MQTT broker port
         port: MQTT broker 端口
+        username: MQTT username, optional
         username: MQTT 用户名（可选）
+        password: MQTT password, optional
         password: MQTT 密码（可选）
+        status_cache: Device status cache
         status_cache: 设备状态缓存
+        _async_client: Async MQTT client
         _async_client: 异步 MQTT 客户端
+        _sync_client: Sync MQTT client
         _sync_client: 同步 MQTT 客户端
+        _callbacks: Callback dictionary
         _callbacks: 回调函数字典
     """
 
@@ -74,12 +90,18 @@ class MowerMQTT:
         reconnect_min_delay: int = 1,
         reconnect_max_delay: int = 60,
     ):
-        """初始化 MQTT 客户端。
+        """Initialize the MQTT client.
+
+        初始化 MQTT 客户端。
 
         Args:
+            broker: MQTT broker address
             broker: MQTT broker 地址
+            port: MQTT broker port
             port: MQTT broker 端口
+            username: MQTT username, optional
             username: MQTT 用户名（可选）
+            password: MQTT password, optional
             password: MQTT 密码（可选）
         """
         self.broker = broker
@@ -155,6 +177,7 @@ class MowerMQTT:
         Returns:
             Topic 路径
         """
+        # TODO: Adjust according to the actual MQTT topic format
         # TODO: 根据实际 MQTT topic 格式调整
         return f"device/{device_id}/status"
 
@@ -167,6 +190,7 @@ class MowerMQTT:
         Returns:
             Topic 路径
         """
+        # TODO: Adjust according to the actual MQTT topic format
         # TODO: 根据实际 MQTT topic 格式调整
         return f"device/{device_id}/event"
 
@@ -177,6 +201,7 @@ class MowerMQTT:
             MowerMQTTError: 如果连接失败
         """
         try:
+            # Connection happens during subscription; this only verifies the configuration is valid
             # 连接在订阅时执行，这里仅确保配置有效
             self._connected = True
         except Exception as e:
@@ -249,6 +274,7 @@ class MowerMQTT:
         status_topic = self._get_status_topic(device_id)
         event_topic = self._get_event_topic(device_id)
 
+        # Save callback functions
         # 保存回调函数
         self._callbacks[device_id] = {
             "status": on_status_update,
@@ -388,6 +414,7 @@ class MowerMQTT:
                 )
 
                 if topic == status_topic:
+                    # Handle status updates
                     # 处理状态更新
                     status = DeviceStatus.from_dict(payload)
                     self.status_cache[device_id] = status
@@ -396,11 +423,13 @@ class MowerMQTT:
                         on_status_update(status)
 
                 elif topic == event_topic:
+                    # Handle events
                     # 处理事件
                     if on_event:
                         on_event(payload)
 
             except Exception as e:
+                # Log the error but continue processing
                 # 记录错误但继续处理
                 print(f"Error processing MQTT message: {e}")
 
@@ -414,6 +443,7 @@ class MowerMQTT:
             self._sync_client.subscribe(status_topic)
             self._sync_client.subscribe(event_topic)
 
+            # Save callback functions
             # 保存回调函数
             self._callbacks[device_id] = {
                 "status": on_status_update,

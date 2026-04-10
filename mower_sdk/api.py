@@ -1,4 +1,8 @@
-"""REST API 客户端模块。
+"""REST API client module.
+
+REST API 客户端模块。
+
+Provides functionality for interacting with the mower platform REST API.
 
 提供与割草机平台 REST API 交互的功能。
 """
@@ -14,22 +18,34 @@ from mower_sdk.models import Device, DeviceStatus, MowerCommand
 
 
 class MowerAPI:
-    """REST API 客户端。
+    """REST API client.
+
+    REST API 客户端。
+
+    Provides synchronous and asynchronous interfaces for interacting with the mower platform API.
 
     提供与割草机平台 API 交互的同步和异步接口。
 
     Attributes:
+        base_url: API base URL (TODO: configure the actual API base URL)
         base_url: API 基础 URL（TODO: 需要配置实际的 API 基础 URL）
+        session: aiohttp session (async)
         session: aiohttp 会话（异步）
+        token: Access token
         token: 访问令牌
     """
 
     def __init__(self, session: aiohttp.ClientSession, token: str, base_url: str):
-        """初始化 API 客户端。
+        """Initialize the API client.
+
+        初始化 API 客户端。
 
         Args:
+            session: aiohttp session
             session: aiohttp 会话
+            token: Access token
             token: 访问令牌
+            base_url: API base URL
             base_url: API 基础 URL
         """
         self.base_url = base_url.rstrip("/")
@@ -37,11 +53,17 @@ class MowerAPI:
         self._token = token
 
     def set_token(self, token: str) -> None:
-        """更新访问令牌。"""
+        """Update the access token.
+
+        更新访问令牌。
+        """
         self._token = token
 
     def _get_auth_headers(self) -> dict[str, str]:
-        """获取认证头。"""
+        """Get authentication headers.
+
+        获取认证头。
+        """
         if not self._token:
             raise MowerAPIError(
                 ERROR_MESSAGES["TOKEN_EXPIRED"],
@@ -57,18 +79,26 @@ class MowerAPI:
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """发送异步 HTTP 请求。
+        """Send an asynchronous HTTP request.
+
+        发送异步 HTTP 请求。
 
         Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
             method: HTTP 方法（GET, POST, PUT, DELETE）
+            endpoint: API endpoint (relative path)
             endpoint: API 端点（相对路径）
+            data: Request body data, optional
             data: 请求体数据（可选）
+            params: Query parameters, optional
             params: 查询参数（可选）
 
         Returns:
+            Response JSON data
             响应 JSON 数据
 
         Raises:
+            MowerAPIError: If the request fails
             MowerAPIError: 如果请求失败
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
@@ -283,6 +313,7 @@ class MowerAPI:
         for result in command_results:
             if result.get("status") == "ERROR":
                 error_code = result.get("errorCode") or "COMMAND_FAILED"
+                # Treat the command as successful if the device is already in the desired state to avoid duplicate actions or state desync errors
                 # 设备已处于目标状态时视为成功，避免重复点击或状态不同步时报错
                 if error_code == "alreadyInState":
                     continue
@@ -344,6 +375,8 @@ class MowerAPI:
     def __del__(self):
         """清理资源。"""
         if hasattr(self, "_session") and self._session and not self._session.closed:
+            # Note: await cannot be used in __del__; this only attempts to close the session
             # 注意：在 __del__ 中不能使用 await，这里只是尝试关闭
+            # A better approach is to use a context manager or explicitly call close
             # 更好的做法是使用上下文管理器或显式调用 close 方法
             pass
