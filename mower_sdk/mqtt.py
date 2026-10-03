@@ -70,7 +70,7 @@ class MowerMQTT:
         password: str | None = None,
         ws_path: str | None = None,
         auth_headers: dict[str, str] | None = None,
-        keepalive_seconds: int = 2400,
+        keepalive_seconds: int = 60,
         reconnect_min_delay: int = 1,
         reconnect_max_delay: int = 60,
     ):
@@ -466,7 +466,16 @@ class NavimowMQTT:
         ws_path: str | None = None,
         auth_headers: dict[str, str] | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
-        keepalive_seconds: int = 2400,
+        # Keepalive default 60s. Measured against the production broker
+        # (two-day capture, wss path, docked mower): something between the
+        # client and the broker reaps a connection that has been silent for
+        # about ten minutes, and reaps it without a FIN, so the client only
+        # notices when its own PINGREQ is due. At the previous 2400s
+        # default the stream died within minutes of every connect and
+        # stayed dead for up to 40 minutes; a PINGREQ every 60s keeps the
+        # connection inside the reaper's window and detects a dead link
+        # within ~90s. Callers may still override this.
+                keepalive_seconds: int = 60,
         reconnect_min_delay: int = 1,
         reconnect_max_delay: int = 60,
     ) -> None:

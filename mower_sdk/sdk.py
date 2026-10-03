@@ -40,7 +40,7 @@ class NavimowSDK:
         auth_headers: dict[str, str] | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
         records: list[Any] | None = None,
-        keepalive_seconds: int = 2400,
+        keepalive_seconds: int = 60,
         reconnect_min_delay: int = 1,
         reconnect_max_delay: int = 60,
     ) -> None:
