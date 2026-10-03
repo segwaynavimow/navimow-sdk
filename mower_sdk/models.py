@@ -36,8 +36,18 @@ def _normalize_state_value(raw_state: Any) -> str:
     return _RAW_STATE_TO_CANONICAL.get(raw_state, raw_state)
 
 
-def _extract_battery_value(data: dict[str, Any]) -> int:
-    """Extract battery percentage from multiple payload formats."""
+def _extract_battery_value(data: dict[str, Any]) -> int | None:
+    """Extract battery percentage from multiple payload formats.
+
+    Returns None when the payload carries no usable battery data. Callers
+    must treat None as "unknown" and keep/ignore it rather than rendering a
+    percentage: the previous behaviour of returning 0 here made a payload
+    without battery fields look like a fully discharged battery, which is
+    how battery graphs developed phantom drops to 0% that "recovered"
+    hours later when the next real reading arrived. An explicit 0
+    (e.g. capacityRemaining 0% / descriptiveCapacityRemaining
+    CRITICALLY_LOW) still parses as 0 and is preserved as-is.
+    """
     def _to_int_or_none(value: Any) -> int | None:
         try:
             return int(value)
@@ -61,13 +71,18 @@ def _extract_battery_value(data: dict[str, Any]) -> int:
                 if raw_value is not None:
                     return raw_value
 
-        # Compatibility fallback: if PERCENTAGE unit missing, try first item.
+        # Compatibility fallback: if the unit field is absent entirely,
+        # try the first item. An explicit non-PERCENTAGE unit (e.g. a
+        # millivolt reading) is NOT a percentage and must not be treated as
+        # one — that path returns None (unknown) instead.
         if capacity_remaining and isinstance(capacity_remaining[0], dict):
-            raw_value = _to_int_or_none(capacity_remaining[0].get("rawValue"))
-            if raw_value is not None:
-                return raw_value
+            first = capacity_remaining[0]
+            if not str(first.get("unit", "")).strip():
+                raw_value = _to_int_or_none(first.get("rawValue"))
+                if raw_value is not None:
+                    return raw_value
 
-    return 0
+    return None
 
 
 class MowerStatus(Enum):
@@ -289,7 +304,7 @@ class DeviceStatus:
 
     device_id: str
     status: MowerStatus
-    battery: int
+    battery: int | None = None
     position: dict[str, float] | None = None
     error_code: MowerError = MowerError.NONE
     error_message: str | None = None
