@@ -11,6 +11,7 @@ from typing import Any
 
 from mower_sdk.models import (
     DeviceAttributesMessage,
+    DeviceLocationMessage,
     DeviceCommandMessage,
     DeviceEventMessage,
     DeviceStateMessage,
@@ -63,9 +64,11 @@ class NavimowSDK:
         self._state_callbacks: list[Callable[[DeviceStateMessage], None]] = []
         self._event_callbacks: list[Callable[[DeviceEventMessage], None]] = []
         self._attributes_callbacks: list[Callable[[DeviceAttributesMessage], None]] = []
+        self._location_callbacks: list[Callable[[DeviceLocationMessage], None]] = []
 
         self._state_cache: dict[str, DeviceStateMessage] = {}
         self._attributes_cache: dict[str, DeviceAttributesMessage] = {}
+        self._location_cache: dict[str, DeviceLocationMessage] = {}
 
     def connect(self) -> None:
         """Connect to MQTT broker and start consuming."""
@@ -101,11 +104,17 @@ class NavimowSDK:
     def on_attributes(self, callback: Callable[[DeviceAttributesMessage], None]) -> None:
         self._attributes_callbacks.append(callback)
 
+    def on_location(self, callback: Callable[[DeviceLocationMessage], None]) -> None:
+        self._location_callbacks.append(callback)
+
     def get_cached_state(self, device_id: str) -> DeviceStateMessage | None:
         return self._state_cache.get(device_id)
 
     def get_cached_attributes(self, device_id: str) -> DeviceAttributesMessage | None:
         return self._attributes_cache.get(device_id)
+
+    def get_cached_location(self, device_id: str) -> DeviceLocationMessage | None:
+        return self._location_cache.get(device_id)
 
     async def _on_mqtt_message(
         self, topic: str, payload: bytes, device_id: str
@@ -144,6 +153,12 @@ class NavimowSDK:
             msg = DeviceAttributesMessage.from_dict(payload_dict)
             self._attributes_cache[msg.device_id] = msg
             for cb in list(self._attributes_callbacks):
+                cb(msg)
+            return
+        if channel == "location":
+            msg = DeviceLocationMessage.from_dict(payload_dict)
+            self._location_cache[msg.device_id] = msg
+            for cb in list(self._location_callbacks):
                 cb(msg)
 
     def _publish_command(self, message: DeviceCommandMessage) -> None:

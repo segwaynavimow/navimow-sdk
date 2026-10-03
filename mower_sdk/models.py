@@ -485,6 +485,76 @@ class DeviceAttributesMessage:
         }
 
 
+def _to_float_or_none(value: Any) -> float | None:
+    """Parse a float strictly; anything else is None.
+
+    The location channel delivers its measurements as JSON strings
+    ('"0.329"') while other fields arrive as numbers, and an unparseable
+    or missing value must stay unknown rather than become 0.
+    """
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass
+class DeviceLocationMessage:
+    """Live position message from the location channel.
+
+    The cloud pushes these on
+    /downlink/vehicle/{device_id}/realtimeDate/location while the mower
+    is driving (and, on some firmware, periodically while docked). The
+    measurements arrive as JSON strings — postureX/postureY in metres,
+    postureTheta in radians — so they are parsed to floats where the
+    string really is numeric and stay None otherwise. The raw payload is
+    kept for forward compatibility.
+    """
+
+    device_id: str
+    x: float | None = None
+    y: float | None = None
+    theta: float | None = None
+    time: int | None = None
+    state_code: str | None = None
+    subtotal_area: float | None = None
+    mowing_week_area: float | None = None
+    raw: dict[str, Any] | None = None
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "DeviceLocationMessage":
+        return cls(
+            device_id=payload.get("device_id", ""),
+            x=_to_float_or_none(payload.get("postureX")),
+            y=_to_float_or_none(payload.get("postureY")),
+            theta=_to_float_or_none(payload.get("postureTheta")),
+            time=payload.get("time") if isinstance(payload.get("time"), int) else None,
+            state_code=payload.get("vehicleState") if isinstance(payload.get("vehicleState"), str) else None,
+            subtotal_area=_to_float_or_none(payload.get("subtotalArea")),
+            mowing_week_area=_to_float_or_none(payload.get("mowingWeekArea")),
+            raw=payload,
+        )
+
+    @property
+    def is_complete(self) -> bool:
+        """True when both coordinates parsed — a plottable position."""
+        return self.x is not None and self.y is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "device_id": self.device_id,
+            "x": self.x,
+            "y": self.y,
+            "theta": self.theta,
+            "time": self.time,
+            "state_code": self.state_code,
+            "subtotal_area": self.subtotal_area,
+            "mowing_week_area": self.mowing_week_area,
+        }
+
+
 @dataclass
 class DeviceCommandMessage:
     """Unified command message for MQTT publish."""

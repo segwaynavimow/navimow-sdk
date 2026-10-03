@@ -149,14 +149,18 @@ class MowerMQTT:
     def _get_status_topic(self, device_id: str) -> str:
         """获取设备状态 topic。
 
+        The broker's real downlink topic layout is
+        /downlink/vehicle/<device_id>/realtimeDate/<channel>; the previous
+        placeholder (device/<id>/status) matched nothing the broker
+        publishes, so subscriptions silently received no data.
+
         Args:
             device_id: 设备 ID
 
         Returns:
             Topic 路径
         """
-        # TODO: 根据实际 MQTT topic 格式调整
-        return f"device/{device_id}/status"
+        return f"/downlink/vehicle/{device_id}/realtimeDate/state"
 
     def _get_event_topic(self, device_id: str) -> str:
         """获取设备事件 topic。
@@ -167,8 +171,7 @@ class MowerMQTT:
         Returns:
             Topic 路径
         """
-        # TODO: 根据实际 MQTT topic 格式调整
-        return f"device/{device_id}/event"
+        return f"/downlink/vehicle/{device_id}/realtimeDate/event"
 
     async def async_connect(self) -> None:
         """异步连接 MQTT broker。
@@ -633,6 +636,7 @@ class NavimowMQTT:
             self.client.subscribe("/downlink/vehicle/+/realtimeDate/state")
             self.client.subscribe("/downlink/vehicle/+/realtimeDate/event")
             self.client.subscribe("/downlink/vehicle/+/realtimeDate/attributes")
+            self.client.subscribe("/downlink/vehicle/+/realtimeDate/location")
             return
 
         _LOGGER.info(
@@ -644,6 +648,9 @@ class NavimowMQTT:
             self.client.subscribe(
                 f"/downlink/vehicle/{device_id}/realtimeDate/attributes"
             )
+            self.client.subscribe(
+                f"/downlink/vehicle/{device_id}/realtimeDate/location"
+            )
 
     def unsubscribe_all(self, product_key: str, device_name: str) -> None:
         device_ids = self._get_device_ids()
@@ -652,6 +659,7 @@ class NavimowMQTT:
             self.client.unsubscribe("/downlink/vehicle/+/realtimeDate/state")
             self.client.unsubscribe("/downlink/vehicle/+/realtimeDate/event")
             self.client.unsubscribe("/downlink/vehicle/+/realtimeDate/attributes")
+            self.client.unsubscribe("/downlink/vehicle/+/realtimeDate/location")
             return
 
         _LOGGER.info(
@@ -662,6 +670,9 @@ class NavimowMQTT:
             self.client.unsubscribe(f"/downlink/vehicle/{device_id}/realtimeDate/event")
             self.client.unsubscribe(
                 f"/downlink/vehicle/{device_id}/realtimeDate/attributes"
+            )
+            self.client.unsubscribe(
+                f"/downlink/vehicle/{device_id}/realtimeDate/location"
             )
 
     def _schedule(self, coro: Awaitable[None]) -> None:
